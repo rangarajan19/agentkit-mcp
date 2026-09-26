@@ -8,6 +8,8 @@ permissions:
 
 jobs:
   triage:
+    # opt-in: set the repository variable ENABLE_TRIAGE=true after adding the secrets
+    if: ${{ vars.ENABLE_TRIAGE == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

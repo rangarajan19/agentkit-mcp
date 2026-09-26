@@ -1,7 +1,18 @@
-# Agentic System: an MCP-first agent framework
+# agentkit-mcp: an MCP-first agent framework
 
-A small **agent framework** (`agentkit/`) where **every tool is an MCP tool**, plus two example
-agents built on it. Runs on the **free tier** of the Gemini API. No Docker needed.
+![tests](https://github.com/rangarajan19/agentkit-mcp/actions/workflows/tests.yml/badge.svg)
+
+A small **agent framework** (`agentkit/`) where **every tool is an MCP tool**, with safety
+guardrails at the tool layer, plus two example agents built on it. Runs on the **free tier** of
+the Gemini API. No Docker needed. See [docs/architecture.md](docs/architecture.md) for the design.
+
+## Status
+Early (v0.1). What has been verified by running it:
+- Agent loop, MCP client (local stdio server and the hosted GitHub MCP server), guardrails: covered by 28 tests.
+- Issue triage: ran end to end on a real public issue in **dry-run** mode; the research agent produced a cited report.
+
+Not verified yet: real label/comment writes, the GitHub Actions workflow, and triage *accuracy*
+(no evaluation set yet). Treat triage output as suggestions until you have run it with `--approve`.
 
 ```
 examples ──► agentkit ──► Gemini (LLM)
@@ -80,15 +91,22 @@ pytest
 ```
 The research agent also needs [`uv`](https://docs.astral.sh/uv/) (for `uvx`).
 
-### Run triage automatically on new issues
-Add two repository secrets: `GEMINI_API_KEY` and `TRIAGE_GITHUB_PAT` (a fine-grained token with
-Issues read/write on the repo). The hosted GitHub MCP server needs a personal token, not the
-built-in Actions `GITHUB_TOKEN`. See `.github/workflows/triage.yml`.
+### Run triage automatically on new issues (opt-in)
+The workflow in `.github/workflows/triage.yml` is off by default. To enable it:
+1. Add repository secrets `GEMINI_API_KEY` and `TRIAGE_GITHUB_PAT` (a fine-grained token with
+   Issues read/write on the repo). The hosted GitHub MCP server needs a personal token, not the
+   built-in Actions `GITHUB_TOKEN`.
+2. Add a repository variable `ENABLE_TRIAGE` = `true` (Settings > Secrets and variables > Actions > Variables).
+
+The workflow writes for real (`DRY_RUN=false`). Try `--approve` locally first.
 
 ## Notes
 - Free-tier Gemini content may be used by Google to improve its products: use public data only.
 - Rate limits are per project (aistudio.google.com/rate-limit); 429s are retried with backoff.
 - MCP tool output is untrusted input, so keep `allow` lists tight.
+
+## Contributing and license
+See [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under the [MIT License](LICENSE).
 
 ## Roadmap
 - [x] Framework core, MCP client, guardrails, tracing
