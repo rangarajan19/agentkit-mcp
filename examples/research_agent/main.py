@@ -5,6 +5,8 @@ from . import agent
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):  # models emit non-ASCII; Windows consoles default to cp1252
+        stream.reconfigure(encoding="utf-8", errors="replace")
     p = argparse.ArgumentParser(description="Research agent (MCP web tools)")
     p.add_argument("topic")
     p.add_argument("--out", help="save the report to this markdown file")

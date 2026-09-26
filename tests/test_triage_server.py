@@ -64,3 +64,34 @@ def test_find_similar_ranks_filters_and_skips_prs_and_self(monkeypatch):
 def test_find_similar_with_no_candidates(monkeypatch):
     monkeypatch.setattr(ts, "_repo", lambda o, r: FakeRepo([issue(1, "only issue")]))
     assert ts.find_similar_issues("o", "r", 1) == []
+
+
+def test_duplicate_label_needs_an_older_original():
+    assert ts.check_duplicate(["bug", "duplicate"], 3, 1) == (["bug", "duplicate"], "")
+    labels, note = ts.check_duplicate(["bug", "duplicate"], 1, 3)   # pointing at a NEWER issue
+    assert labels == ["bug"] and "OLDER" in note
+    labels, note = ts.check_duplicate(["duplicate"], 5, None)       # no original given
+    assert labels == [] and "OLDER" in note
+    assert ts.check_duplicate(["bug"], 5, None) == (["bug"], "")    # not a duplicate: untouched
+
+
+def test_apply_labels_never_marks_the_original_as_duplicate(monkeypatch):
+    sink = []
+    monkeypatch.setattr(ts, "_repo", lambda o, r: FakeRepo([issue(1, "orig", labels_sink=sink)]))
+    out = ts.apply_labels("o", "r", 1, ["bug", "duplicate"], duplicate_of=3)
+    assert sink == ["bug"] and "OLDER" in out
+
+
+def test_apply_labels_accepts_a_real_duplicate(monkeypatch):
+    sink = []
+    monkeypatch.setattr(ts, "_repo", lambda o, r: FakeRepo([issue(3, "copy", labels_sink=sink)]))
+    ts.apply_labels("o", "r", 3, ["bug", "duplicate"], duplicate_of=1)
+    assert sink == ["bug", "duplicate"]
+
+
+def test_find_similar_marks_which_matches_are_older(monkeypatch):
+    repo = FakeRepo([issue(1, "login broken"), issue(2, "login fails"), issue(3, "login broke")])
+    monkeypatch.setattr(ts, "_repo", lambda o, r: repo)
+    monkeypatch.setattr(ts, "_embed", lambda texts: [[1, 0]] * len(texts))
+    older = {r["number"]: r["older_than_this_issue"] for r in ts.find_similar_issues("o", "r", 2)}
+    assert older == {1: True, 3: False}

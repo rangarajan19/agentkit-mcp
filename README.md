@@ -8,11 +8,15 @@ the Gemini API. No Docker needed. See [docs/architecture.md](docs/architecture.m
 
 ## Status
 Early (v0.1). What has been verified by running it:
-- Agent loop, MCP client (local stdio server and the hosted GitHub MCP server), guardrails: covered by 28 tests.
-- Issue triage: ran end to end on a real public issue in **dry-run** mode; the research agent produced a cited report.
+- Agent loop, MCP client (local stdio server and the hosted GitHub MCP server), guardrails, and both
+  LLM providers: covered by 47 automated tests (no network needed).
+- Issue triage ran end to end in **dry-run** mode on real issues with Gemini and with the free
+  `nvidia/nemotron-3-super-120b-a12b` model on OpenRouter (4 test issues: clear bug, vague report,
+  duplicate, prompt-injection attempt). The research agent produced a cited report.
 
 Not verified yet: real label/comment writes, the GitHub Actions workflow, and triage *accuracy*
-(no evaluation set yet). Treat triage output as suggestions until you have run it with `--approve`.
+(4 examples is not an evaluation set). Treat triage output as suggestions until you have run it
+with `--approve`.
 
 ```
 examples ──► agentkit ──► Gemini (LLM)
@@ -28,7 +32,9 @@ examples ──► agentkit ──► Gemini (LLM)
 agentkit/
   agent.py            the agent loop: model -> tool calls -> observations -> repeat
   llm/base.py         LLM interface (generate, embed)
-  llm/gemini.py       Gemini adapter (add Groq/Ollama by implementing the interface)
+  llm/gemini.py       Gemini adapter: retry, and fallback across a model chain
+  llm/openrouter.py   OpenRouter adapter (OpenAI-compatible; many free models)
+  llm/factory.py      make_llm("openrouter:<model>" | "gemini:<a>,<b>")
   tools/mcp_client.py MCPToolset: connect to an MCP server, expose its tools (allow/deny lists)
   tools/registry.py   one lookup table of tools; the single place calls are dispatched
   guardrails.py       dry-run / human approval / per-tool argument rules
@@ -66,6 +72,16 @@ with MCPToolset(server, allow=["add", "word_count"]) as mcp:   # a URL string wo
 ```
 Guardrail modes: `live`, `dry_run` (writes are reported, never executed), `approve` (ask a human).
 
+## Choosing a model
+Default is a Gemini chain (`gemini-3.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash`): if a model is out of
+free quota or overloaded, the next one is used. Free models on [OpenRouter](https://openrouter.ai/models)
+also work (set `OPENROUTER_API_KEY`; free models need a `:free` suffix and are rate limited):
+```
+python -m examples.issue_triage.main --repo o/r --issue 1 --model "openrouter:nvidia/nemotron-3-super-120b-a12b:free"
+```
+Free tiers change often, so check current limits. OpenRouter has no free embedding models, so duplicate
+detection keeps using Gemini embeddings.
+
 ## Example 1: issue triage agent
 ```
 python -m examples.issue_triage.main --repo owner/repo --issue 1            # dry run (default)
@@ -74,6 +90,8 @@ python -m examples.issue_triage.main --repo owner/repo --issue 1 --approve  # co
 Tools: GitHub MCP `issue_read`, `add_issue_comment`, `get_file_contents` (3 of its 45 tools,
 allow-listed) + our `find_similar_issues` and `apply_labels`. Safety layers: tool allow-list,
 target repo/issue scoping, comment length cap, server-side label allow-list, dry-run/approval, step limit.
+The `duplicate` label is enforced in code: it requires `duplicate_of` pointing at an *older* issue, so the
+original report can never be marked as a copy of a newer one.
 Issue text is treated as untrusted. Set `DRY_RUN=false` in `.env` to write for real.
 
 ## Example 2: research agent
@@ -111,6 +129,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under the [MIT License](LICENSE
 ## Roadmap
 - [x] Framework core, MCP client, guardrails, tracing
 - [x] GitHub MCP server integration, our own MCP server, two example agents
-- [ ] More LLM providers (Groq, Ollama)
+- [x] Second LLM provider (OpenRouter) and model fallback
+- [ ] Evaluation set to measure triage accuracy across models
+- [ ] More providers (Groq, Ollama)
 - [ ] Persist conversation memory across runs
 - [ ] Demo GIF and architecture diagram
