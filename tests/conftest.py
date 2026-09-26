@@ -1,5 +1,6 @@
 import sys
 
+import pytest
 from mcp import StdioServerParameters
 
 from agentkit.types import LLMResponse, Message
@@ -25,3 +26,10 @@ class FakeLLM:
 
 def say(text: str) -> Message:
     return Message("assistant", text=text)
+
+
+@pytest.fixture(autouse=True)
+def fake_api_keys(monkeypatch):
+    """Tests must not depend on a developer's .env (CI has none) and never use real keys."""
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
